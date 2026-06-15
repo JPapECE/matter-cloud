@@ -1,0 +1,30 @@
+{
+  "name": "matter-cloud",
+  "version": "1.0.0",
+  "description": "Matter cloud coordinator API — diploma thesis",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/api/server.ts",
+    "build": "tsc",
+    "start": "node dist/api/server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^4.22.1",
+    "pg": "^8.21.0",
+    "ws": "^8.21.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.25",
+    "@types/node": "^20.19.39",
+    "@types/pg": "^8.11.11",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  },
+  "main": "dist/api/server.js",
+  "author": "",
+  "license": "ISC"
+}
