@@ -258,7 +258,44 @@ export class DatabaseService {
 
   public async getDeviceCapabilities(nodeId: string): Promise<any | null> {
     const res = await this.pool.query('SELECT * FROM device_capabilities WHERE "nodeId" = $1', [nodeId]);
-    return res.rows[0] || null;
+    const row = res.rows[0];
+    if (!row) return null;
+
+    // Get the device type from the devices table
+    const dev = await this.getDevice(nodeId);
+    let deviceType = "Unknown";
+    if (dev) {
+      if (row.supportsColorTemp) {
+        deviceType = "ColorTemperatureLight";
+      } else if (row.supportsLevel) {
+        deviceType = "DimmablePlugInUnit";
+      } else if (row.supportsOnOff) {
+        deviceType = "OnOffPlugInUnit";
+      }
+    }
+
+    const minMireds = row.minMireds;
+    const maxMireds = row.maxMireds;
+    const minKelvin = maxMireds ? Math.round(1_000_000 / maxMireds) : null;
+    const maxKelvin = minMireds ? Math.round(1_000_000 / minMireds) : null;
+
+    return {
+      nodeId:                  row.nodeId,
+      deviceType,
+      deviceTypeId:            0,
+      serverClusters:          [],
+      clientClusters:          [],
+      clusters:                [],
+      hasOnOff:                !!row.supportsOnOff,
+      hasLevelControl:         !!row.supportsLevel,
+      hasElectricalPower:      !!row.supportsEnergy,
+      hasElectricalEnergy:     !!row.supportsEnergy,
+      hasPumpControl:          false,
+      hasOnOffLightingFeature: null,
+      hasColorTemperature:     !!row.supportsColorTemp,
+      colorTempMinKelvin:      minKelvin,
+      colorTempMaxKelvin:      maxKelvin,
+    };
   }
 
   // ── Groups Cache ───────────────────────────────────────────────────────────
