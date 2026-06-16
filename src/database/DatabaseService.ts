@@ -188,6 +188,17 @@ export class DatabaseService {
 
   // ── Devices & Capabilities ──────────────────────────────────────────────────
 
+  public async upsertDevice(nodeId: string, name: string, type: string): Promise<void> {
+    await this.pool.query(`
+      INSERT INTO devices ("nodeId", name, type, "addedAt", online)
+      VALUES ($1, $2, $3, NOW(), TRUE)
+      ON CONFLICT ("nodeId") DO UPDATE SET
+        name   = EXCLUDED.name,
+        type   = EXCLUDED.type,
+        online = TRUE
+    `, [nodeId, name, type]);
+  }
+
   public async getAllDevices(): Promise<any[]> {
     const res = await this.pool.query('SELECT * FROM devices ORDER BY "addedAt" ASC');
     return res.rows;

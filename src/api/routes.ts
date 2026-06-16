@@ -134,13 +134,27 @@ router.post("/api/commission", async (req, res) => {
   console.log("[API] POST /api/commission. Triggering commissioning payload:", logPayload);
 
   try {
+    // Gateway returns the nodeId string after commissioning completes
     const nodeId = await commandDispatcher.dispatch("commission", undefined, {
       pairingCode,
       name,
       type: type || "smart-plug",
       wifi,
     });
-    res.status(201).json({ nodeId, success: true });
+
+    // Immediately persist the device to Postgres so the dashboard shows it
+    // without waiting for the next gateway reconnect + init_state reconciliation.
+    // Use upsert so a re-commission of the same nodeId is idempotent.
+    try {
+      await dbService.upsertDevice(nodeId, name, type || "smart-plug");
+      console.log(`[API] Device ${nodeId} ("${name}") written to Postgres after commission.`);
+    } catch (dbErr: any) {
+      // Non-fatal — device will appear on next gateway reconnect via reconcileFromGateway
+      console.error(`[API] Failed to write device ${nodeId} to Postgres after commission:`, dbErr.message);
+    }
+
+    // Return both nodeId and name so the frontend can display the correct name
+    res.status(201).json({ nodeId, name, success: true });
   } catch (err: any) {
     handleCommandError(err, res);
   }
