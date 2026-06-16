@@ -36,9 +36,15 @@ export class DatabaseService {
           name      TEXT        NOT NULL,
           type      TEXT        NOT NULL DEFAULT 'unknown',
           "addedAt"   TIMESTAMPTZ NOT NULL,
-          online    BOOLEAN     NOT NULL DEFAULT FALSE
+          online    BOOLEAN     NOT NULL DEFAULT FALSE,
+          "on"      BOOLEAN,
+          level     SMALLINT
         );
       `);
+
+      // Add on/level columns to existing deployments that pre-date this migration
+      await client.query(`ALTER TABLE devices ADD COLUMN IF NOT EXISTS "on" BOOLEAN`);
+      await client.query(`ALTER TABLE devices ADD COLUMN IF NOT EXISTS level SMALLINT`);
 
       // 2. device_capabilities table
       await client.query(`
@@ -194,6 +200,14 @@ export class DatabaseService {
 
   public async updateDeviceOnlineStatus(nodeId: string, online: boolean): Promise<void> {
     await this.pool.query('UPDATE devices SET online = $1 WHERE "nodeId" = $2', [online, nodeId]);
+  }
+
+  public async updateDeviceOnOffState(nodeId: string, on: boolean): Promise<void> {
+    await this.pool.query('UPDATE devices SET "on" = $1 WHERE "nodeId" = $2', [on, nodeId]);
+  }
+
+  public async updateDeviceLevelState(nodeId: string, level: number): Promise<void> {
+    await this.pool.query('UPDATE devices SET level = $1 WHERE "nodeId" = $2', [level, nodeId]);
   }
 
   public async updateDeviceName(nodeId: string, name: string): Promise<void> {

@@ -249,4 +249,164 @@ router.post("/api/devices/:id/timed-on", async (req, res) => {
   }
 });
 
+// ── Level move / stop / step ─────────────────────────────────────────────────
+
+router.post("/api/devices/:id/level/move", async (req, res) => {
+  const { id } = req.params;
+  const { direction, rate } = req.body;
+
+  if (direction !== "up" && direction !== "down") {
+    res.status(400).json({ error: "direction must be 'up' or 'down'" });
+    return;
+  }
+
+  try {
+    await commandDispatcher.dispatch("level_move", id, { direction, rate });
+    res.json({ success: true });
+  } catch (err: any) {
+    handleCommandError(err, res);
+  }
+});
+
+router.post("/api/devices/:id/level/stop", async (req, res) => {
+  const { id } = req.params;
+  try {
+    await commandDispatcher.dispatch("level_stop", id);
+    res.json({ success: true });
+  } catch (err: any) {
+    handleCommandError(err, res);
+  }
+});
+
+router.post("/api/devices/:id/level/step", async (req, res) => {
+  const { id } = req.params;
+  const { direction, stepSize, transitionTime } = req.body;
+
+  if (direction !== "up" && direction !== "down") {
+    res.status(400).json({ error: "direction must be 'up' or 'down'" });
+    return;
+  }
+
+  try {
+    await commandDispatcher.dispatch("level_step", id, { direction, stepSize, transitionTime });
+    res.json({ success: true });
+  } catch (err: any) {
+    handleCommandError(err, res);
+  }
+});
+
+// ── GET /api/devices/:id/status ──────────────────────────────────────────────
+// Lightweight status — read from Postgres cache (no gateway round-trip)
+router.get("/api/devices/:id/status", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const device = await dbService.getDevice(id);
+    if (!device) {
+      res.status(404).json({ error: `Device ${id} not found` });
+      return;
+    }
+    res.json({
+      nodeId: device.nodeId,
+      online: device.online ?? false,
+      on:     device.on    ?? null,
+      level:  device.level ?? null,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GET /api/devices/:id/full-status ─────────────────────────────────────────
+// Returns status + latest energy snapshot from Postgres (no gateway round-trip)
+router.get("/api/devices/:id/full-status", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const device = await dbService.getDevice(id);
+    if (!device) {
+      res.status(404).json({ error: `Device ${id} not found` });
+      return;
+    }
+
+    // Most recent energy reading from history
+    const energyRows = await dbService.getEnergyHistory(id, 1);
+    const latest     = energyRows[0] ?? null;
+
+    const power: Record<string, unknown> = {
+      nodeId:      id,
+      activePower: latest?.activePower      ?? null,
+      voltage:     latest?.voltage          ?? null,
+      current:     latest?.current          ?? null,
+      timestamp:   latest?.recordedAt       ?? new Date().toISOString(),
+    };
+
+    const energy: Record<string, unknown> = {
+      nodeId:                   id,
+      cumulativeEnergy:         latest?.cumulativeEnergy         ?? null,
+      periodicEnergy:           latest?.periodicEnergy           ?? null,
+      cumulativeEnergyExported: latest?.cumulativeEnergyExported ?? null,
+      periodicEnergyExported:   latest?.periodicEnergyExported   ?? null,
+      timestamp:                latest?.recordedAt               ?? new Date().toISOString(),
+    };
+
+    res.json({
+      status: {
+        nodeId: device.nodeId,
+        online: device.online ?? false,
+        on:     device.on     ?? null,
+        level:  device.level  ?? null,
+      },
+      power,
+      energy,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GET /api/devices/:id/color-temperature ───────────────────────────────────
+// Returns CT range from capabilities cache. Current mireds/kelvin are delivered
+// via WebSocket state_change events, not stored in Postgres — returned as null.
+router.get("/api/devices/:id/color-temperature", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const caps = await dbService.getDeviceCapabilities(id);
+
+    const minMireds = caps?.minMireds ?? null;
+    const maxMireds = caps?.maxMireds ?? null;
+    const minKelvin = maxMireds ? Math.round(1_000_000 / maxMireds) : null;
+    const maxKelvin = minMireds ? Math.round(1_000_000 / minMireds) : null;
+
+    res.json({
+      nodeId:     id,
+      mireds:     null, // live value — updated via WS state_change events
+      kelvin:     null,
+      minMireds,
+      maxMireds,
+      minKelvin,
+      maxKelvin,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── PATCH /api/devices/:id/name ───────────────────────────────────────────────
+// Updates the device display name in Postgres only — no gateway round-trip needed.
+router.patch("/api/devices/:id/name", async (req, res) => {
+  const { id }   = req.params;
+  const { name } = req.body;
+
+  if (!name || typeof name !== "string" || name.trim().length === 0) {
+    res.status(400).json({ error: "name is required and must be a non-empty string" });
+    return;
+  }
+
+  try {
+    await dbService.updateDeviceName(id, name.trim());
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export const apiRouter = router;

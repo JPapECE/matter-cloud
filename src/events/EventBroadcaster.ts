@@ -37,8 +37,12 @@ class EventBroadcaster {
         const recordedAt = payload.power?.timestamp || payload.energy?.timestamp;
         await dbService.saveEnergyReading(nodeId, payload.power, payload.energy, recordedAt);
       } else if (event === "state_change") {
-        // If state change attribute indicates online/offline updates
-        if (payload.attribute === "online") {
+        // Persist live state so GET /full-status and /status can read from Postgres
+        if (payload.attribute === "onOff") {
+          await dbService.updateDeviceOnOffState(nodeId, !!payload.value);
+        } else if (payload.attribute === "currentLevel" && typeof payload.value === "number") {
+          await dbService.updateDeviceLevelState(nodeId, payload.value);
+        } else if (payload.attribute === "online") {
           await dbService.updateDeviceOnlineStatus(nodeId, !!payload.value);
         }
       }
