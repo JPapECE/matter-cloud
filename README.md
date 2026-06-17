@@ -29,7 +29,7 @@ The cloud coordinator acts as the central hub of the three-tier system:
 ```
 
 ### Key Subsystems:
-* **Gateway WebSocket Manager (`/gateway`)**: A full-duplex WebSocket channel that authenticates the local gateway connection, processes startup state reconciliation, and proxies commands downstream.
+* **Gateway WebSocket Manager (`/gateway`)**: A full-duplex WebSocket channel that authenticates the local gateway connection.
 * **Mobile Event Broadcaster (`/ws`)**: A secondary WebSocket server that streams real-time state change events and gateway connection statuses to active mobile users.
 * **Command Dispatcher**: A request-response map that coordinates outgoing command execution. It tracks commands sent downstream with unique correlation IDs (`requestId`) and enforces customizable timeouts (configured via `COMMAND_TIMEOUTS`).
 * **Database Cache Layer**: Caches device metadata, online statuses, current on/off/dimmer states, and historical energy reading analytics in PostgreSQL.
@@ -158,15 +158,3 @@ All routes under `/api/*` require the `Authorization: Bearer <API_KEY>` header.
    ```bash
    npm run start
    ```
-
-### Docker Deployment
-
-The repository contains a multi-stage `Dockerfile` optimizing build speed and caching dependency stages:
-
-```bash
-# Build the image
-docker build -t matter-cloud-api:latest .
-
-# Run container
-docker run -d -p 3000:3000 --env-file .env matter-cloud-api:latest
-```
