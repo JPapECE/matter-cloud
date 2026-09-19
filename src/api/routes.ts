@@ -26,11 +26,13 @@ function handleCommandError(err: any, res: any): void {
 }
 
 // ── GET /health ─────────────────────────────────────────────────────────────
-// Unprotected health check endpoint
+// Unprotected health check endpoint. Includes the gateway's last-known local
+// URL so the app can attempt a direct LAN connection and bypass the cloud.
 router.get("/health", (_req, res) => {
   res.json({
     status: "ok",
     gatewayOnline: gatewayManager.isGatewayConnected(),
+    gatewayLocalUrl: gatewayManager.getGatewayLocalUrl(), // null if gateway has never connected
     timestamp: new Date().toISOString(),
   });
 });
@@ -350,6 +352,8 @@ router.get("/api/devices/:id/full-status", async (req, res) => {
       activePower: latest?.activePower      ?? null,
       voltage:     latest?.voltage          ?? null,
       current:     latest?.current          ?? null,
+      frequency:   latest?.frequency        ?? null,
+      powerFactor: latest?.powerFactor      ?? null,
       timestamp:   latest?.recordedAt       ?? new Date().toISOString(),
     };
 

@@ -70,6 +70,8 @@ export class DatabaseService {
           "activePower"              REAL,
           voltage                  REAL,
           current                  REAL,
+          frequency                REAL,
+          "powerFactor"              REAL,
           "cumulativeEnergy"         REAL,
           "periodicEnergy"           REAL,
           "cumulativeEnergyExported" REAL,
@@ -77,6 +79,10 @@ export class DatabaseService {
           "recordedAt"               TIMESTAMPTZ NOT NULL
         );
       `);
+
+      // Add frequency/powerFactor columns if they don't exist
+      await client.query(`ALTER TABLE energy_readings ADD COLUMN IF NOT EXISTS frequency REAL`);
+      await client.query(`ALTER TABLE energy_readings ADD COLUMN IF NOT EXISTS "powerFactor" REAL`);
 
       // 4. gateways registry table
       await client.query(`
@@ -348,13 +354,15 @@ export class DatabaseService {
   public async saveEnergyReading(nodeId: string, power: any, energy: any, recordedAt?: string): Promise<void> {
     const date = recordedAt ? new Date(recordedAt) : new Date();
     await this.pool.query(`
-      INSERT INTO energy_readings ("nodeId", "activePower", voltage, current, "cumulativeEnergy", "periodicEnergy", "cumulativeEnergyExported", "periodicEnergyExported", "recordedAt")
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      INSERT INTO energy_readings ("nodeId", "activePower", voltage, current, frequency, "powerFactor", "cumulativeEnergy", "periodicEnergy", "cumulativeEnergyExported", "periodicEnergyExported", "recordedAt")
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
     `, [
       nodeId,
       power?.activePower,
       power?.voltage,
       power?.current,
+      power?.frequency,
+      power?.powerFactor,
       energy?.cumulativeEnergy,
       energy?.periodicEnergy,
       energy?.cumulativeEnergyExported,

@@ -11,6 +11,8 @@ import { eventBroadcaster } from "../events/EventBroadcaster.js";
 class GatewayManager {
   private gatewayWs: WebSocket | null = null;
   private isAuthenticated = false;
+  /** Last-known local URL reported by the gateway (e.g. "http://192.168.1.50:4000"). */
+  private gatewayLocalUrl: string | null = null;
 
   public handleConnection(ws: WebSocket): void {
     console.log("[GatewayManager] Connection request initiated from gateway.");
@@ -107,7 +109,14 @@ class GatewayManager {
     switch (type) {
       case "init_state": {
         console.log("[GatewayManager] Received state synchronization (init_state) payload.");
-        const { devices, groups } = msg;
+        const { devices, groups, localIp, localPort } = msg;
+
+        // Store the gateway's local URL for LAN discovery by the app
+        if (localIp && localPort) {
+          this.gatewayLocalUrl = `http://${localIp}:${localPort}`;
+          console.log(`[GatewayManager] Gateway local URL: ${this.gatewayLocalUrl}`);
+        }
+
         try {
           await dbService.reconcileFromGateway(devices || [], groups || []);
           console.log("[GatewayManager] State synchronization complete.");
@@ -141,6 +150,11 @@ class GatewayManager {
 
   public isGatewayConnected(): boolean {
     return this.isAuthenticated && this.gatewayWs !== null && this.gatewayWs.readyState === WebSocket.OPEN;
+  }
+
+  /** Returns the last-known local URL of the gateway (null if never seen). */
+  public getGatewayLocalUrl(): string | null {
+    return this.gatewayLocalUrl;
   }
 }
 
